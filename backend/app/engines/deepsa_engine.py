@@ -74,7 +74,12 @@ class DeepSAEngine(BaseMLEngine):
         or fallback adaptive thresholding / vesselness filter.
         """
         if isinstance(image_input, (str, Path)):
-            img = cv2.imread(str(image_input), cv2.IMREAD_GRAYSCALE)
+            try:
+                from Preprocessing.Angiogram_Preprocessing.Angiogram_DICOM_KeyFrame_Extraction import parse_dicom_or_image
+                _, frames = parse_dicom_or_image(image_input)
+                img = frames[0]
+            except Exception:
+                img = cv2.imread(str(image_input), cv2.IMREAD_GRAYSCALE)
         elif isinstance(image_input, np.ndarray):
             img = image_input if image_input.ndim == 2 else cv2.cvtColor(image_input, cv2.COLOR_BGR2GRAY)
         else:
@@ -91,16 +96,8 @@ class DeepSAEngine(BaseMLEngine):
                 logging.warning(f"DeepSA detector execution warning ({de}). Using adaptive vessel filter.")
 
         # Option B: Fallback adaptive vessel segmentation filter
-        blur = cv2.GaussianBlur(img, (5, 5), 0)
-        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
-        enhanced = clahe.apply(blur)
-        binary = cv2.adaptiveThreshold(
-            enhanced, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 25, 3
-        )
+        return qca_service.preprocess_mask(img)
 
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-        cleaned = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
-        return qca_service.preprocess_mask(cleaned)
 
     def analyze_qca(
         self,

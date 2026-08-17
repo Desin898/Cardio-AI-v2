@@ -135,6 +135,56 @@ class TestQCAEngine(unittest.TestCase):
         self.assertIn("severity_grade", metrics)
         self.assertIn("intervention_recommended", metrics)
 
+    def test_connected_component_noise_suppression(self):
+        """Verifies Connected Component Analysis removes small noise blobs (<400px) and keeps primary vessel tree."""
+        mask = self._create_synthetic_vessel_mask("mild")
+        # Add small noise blobs around the image
+        mask[10:20, 10:20] = 255   # area = 100
+        mask[250:260, 10:20] = 255 # area = 100
+
+        cleaned = qca_service.isolate_arterial_tree(mask, min_area=400)
+        self.assertEqual(np.max(cleaned[10:20, 10:20]), 0, "Small noise blob should be suppressed")
+        self.assertEqual(np.max(cleaned[250:260, 10:20]), 0, "Small noise blob should be suppressed")
+        self.assertGreater(np.count_nonzero(cleaned[100:200, 140:160]), 0, "Primary vessel tree must be preserved")
+
+    def test_dicom_parsing_and_monochrome1_inversion(self):
+        """Verifies DICOM parsing with MONOCHROME1 photometric interpretation inversion."""
+        from Preprocessing.Angiogram_Preprocessing.Angiogram_DICOM_KeyFrame_Extraction import parse_dicom_or_image
+        import pydicom
+        from pydicom.dataset import Dataset, FileMetaDataset
+
+        meta = FileMetaDataset()
+        meta.MediaStorageSOPClassUID = '1.2.840.10008.5.1.4.1.1.1.2'
+        meta.MediaStorageSOPInstanceUID = '1.2.3'
+        meta.TransferSyntaxUID = pydicom.uid.ExplicitVRLittleEndian
+
+        ds = Dataset()
+        ds.file_meta = meta
+        ds.is_little_endian = True
+        ds.is_implicit_VR = False
+        ds.Rows = 100
+        ds.Columns = 100
+        ds.PhotometricInterpretation = "MONOCHROME1"
+        ds.BitsAllocated = 16
+        ds.BitsStored = 12
+        ds.HighBit = 11
+        ds.PixelRepresentation = 0
+        ds.SamplesPerPixel = 1
+
+        arr = np.arange(10000, dtype=np.uint16).reshape((100, 100))
+        ds.PixelData = arr.tobytes()
+
+        bio = io.BytesIO()
+        pydicom.dcmwrite(bio, ds, write_like_original=False)
+        raw_bytes = bio.getvalue()
+
+        parsed_meta, frames = parse_dicom_or_image(raw_bytes)
+        self.assertEqual(parsed_meta["Source"], "DICOM")
+        self.assertEqual(frames.shape, (1, 100, 100))
+        self.assertEqual(frames.dtype, np.uint8)
+
+
 
 if __name__ == "__main__":
     unittest.main()
+

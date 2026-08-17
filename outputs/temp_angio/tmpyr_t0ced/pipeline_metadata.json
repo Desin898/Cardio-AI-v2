@@ -1,0 +1,22 @@
+{
+    "patient_id": "tmpyr_t0ced",
+    "processed_at": "2026-08-16T16:11:49.203216",
+    "source": "IMAGE",
+    "number_of_original_frames": 1,
+    "selected_frame_indices": [
+        0
+    ],
+    "output_directory": "C:\\Users\\desin\\Downloads\\Cardio-AI-main\\Cardio-AI-main\\outputs\\temp_angio\\tmpyr_t0ced",
+    "variants": [
+        {
+            "rank": 1,
+            "frame_index": 0,
+            "filename": "tmpyr_t0ced_frame_0_rank_1.png",
+            "path": "C:\\Users\\desin\\Downloads\\Cardio-AI-main\\Cardio-AI-main\\outputs\\temp_angio\\tmpyr_t0ced\\tmpyr_t0ced_frame_0_rank_1.png",
+            "label": "Keyframe #1 (Frame 0)",
+            "sharpness": 44.829097451627604,
+            "contrast": 37.92834524051575,
+            "edge_strength": 25.832830794612324
+        }
+    ]
+}

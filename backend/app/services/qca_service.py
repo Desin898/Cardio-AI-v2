@@ -15,6 +15,7 @@ from scipy.ndimage import distance_transform_edt
 from scipy.signal import savgol_filter
 
 from backend.app.core.config import settings
+from Preprocessing.Angiogram_Preprocessing.Angiogram_DICOM_KeyFrame_Extraction import parse_dicom_or_image
 
 
 class QCAService:
@@ -26,12 +27,61 @@ class QCAService:
     """
 
     @staticmethod
-    def preprocess_mask(mask_input: Any) -> np.ndarray:
-        """Converts mask input (PIL Image, numpy array, or path) into a clean binary uint8 array."""
+    def isolate_arterial_tree(binary_mask: np.ndarray, min_area: int = 400) -> np.ndarray:
+        """
+        Applies Connected Component Analysis (cv2.connectedComponentsWithStats)
+        to suppress noise blobs and isolate strictly the primary connected arterial tree.
+        Applies morphological closing to smooth vessel borders and close lumen gaps.
+        """
+        if binary_mask is None or np.count_nonzero(binary_mask) == 0:
+            return np.zeros_like(binary_mask, dtype=np.uint8)
+
+        # 1. Connected Component Analysis
+        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
+            binary_mask.astype(np.uint8), connectivity=8
+        )
+
+        cleaned_mask = np.zeros_like(binary_mask, dtype=np.uint8)
+        if num_labels <= 1:
+            return cleaned_mask
+
+        # Filter components (label 0 is background)
+        valid_labels = []
+        areas = stats[1:, cv2.CC_STAT_AREA]
+
+        # Keep components with area > min_area, or fall back to largest component if none > min_area
+        large_indices = np.where(areas >= min_area)[0] + 1
+        if len(large_indices) > 0:
+            valid_labels = list(large_indices)
+        else:
+            largest_label = int(np.argmax(areas)) + 1
+            valid_labels = [largest_label]
+
+        for label_idx in valid_labels:
+            cleaned_mask[labels == label_idx] = 255
+
+        # 2. Morphological Closing with Elliptical Kernel
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        closed_mask = cv2.morphologyEx(cleaned_mask, cv2.MORPH_CLOSE, kernel)
+
+        return closed_mask
+
+    @classmethod
+    def preprocess_mask(cls, mask_input: Any) -> np.ndarray:
+        """
+        Converts mask or raw image input into a clean binary uint8 vessel mask.
+        Enhances contrast using CLAHE, applies adaptive thresholding/segmentation,
+        suppresses noise via Connected Component Analysis, and closes lumen gaps.
+        """
         if isinstance(mask_input, (str, Path)):
-            if not os.path.exists(mask_input):
+            path_obj = Path(mask_input)
+            if not path_obj.exists():
                 raise FileNotFoundError(f"Mask file not found: {mask_input}")
-            mask_np = cv2.imread(str(mask_input), cv2.IMREAD_GRAYSCALE)
+            try:
+                _, frames = parse_dicom_or_image(path_obj)
+                mask_np = frames[0]
+            except Exception:
+                mask_np = cv2.imread(str(mask_input), cv2.IMREAD_GRAYSCALE)
         elif isinstance(mask_input, Image.Image):
             mask_np = np.array(mask_input.convert("L"))
         elif isinstance(mask_input, np.ndarray):
@@ -41,10 +91,23 @@ class QCAService:
         else:
             raise TypeError("Unsupported mask_input format. Expected PIL.Image, np.ndarray, or file path.")
 
-        binary = mask_np > 127
-        binary = remove_small_objects(binary, min_size=300)
-        binary = remove_small_holes(binary, area_threshold=100)
-        return (binary.astype(np.uint8)) * 255
+        # Determine if input is a binary mask or grayscale raw image
+        unique_vals = np.unique(mask_np)
+        if len(unique_vals) <= 2:
+            binary_mask = ((mask_np > 127).astype(np.uint8)) * 255
+        else:
+            # Contrast Enhancement using CLAHE
+            clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+            enhanced = clahe.apply(mask_np)
+
+            # Adaptive Thresholding / Segmentation
+            blur = cv2.GaussianBlur(enhanced, (5, 5), 0)
+            binary_mask = cv2.adaptiveThreshold(
+                blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 25, 3
+            )
+
+        # Isolate arterial tree & apply morphological closing
+        return cls.isolate_arterial_tree(binary_mask, min_area=400)
 
     @staticmethod
     def extract_centerline_and_diameters(binary_mask: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -53,13 +116,36 @@ class QCAService:
         Returns:
             skeleton: 2D boolean array of centerline pixels
             distance_map: 2D float array of perpendicular distances to nearest boundary
-            y_coords, x_coords: 1D arrays of centerline pixel coordinates
+            y_coords, x_coords: 1D arrays of ordered centerline pixel coordinates
         """
         binary_bool = binary_mask > 0
         skeleton = skeletonize(binary_bool)
         distance_map = distance_transform_edt(binary_bool)
 
         y_coords, x_coords = np.where(skeleton)
+        if len(x_coords) > 2:
+            # Order skeleton coordinates sequentially along the vessel path
+            points = np.column_stack((y_coords, x_coords))
+            start_idx = np.argmin(points[:, 0] + points[:, 1])
+
+            ordered_indices = [start_idx]
+            visited = {start_idx}
+            curr = start_idx
+
+            while len(visited) < len(points):
+                curr_pt = points[curr]
+                unvisited = [i for i in range(len(points)) if i not in visited]
+                dists = np.sum((points[unvisited] - curr_pt) ** 2, axis=1)
+                best_u = np.argmin(dists)
+                next_idx = unvisited[best_u]
+
+                visited.add(next_idx)
+                ordered_indices.append(next_idx)
+                curr = next_idx
+
+            y_coords = y_coords[ordered_indices]
+            x_coords = x_coords[ordered_indices]
+
         return skeleton, distance_map, y_coords, x_coords
 
     @staticmethod
@@ -103,21 +189,17 @@ class QCAService:
                 "centerline_coords": [],
             }
 
-        # Order centerline points sequentially along vessel axis
-        sort_order = np.lexsort((x_coords, y_coords))
-        x_coords = x_coords[sort_order]
-        y_coords = y_coords[sort_order]
-
         radii = distance_map[y_coords, x_coords]
         diameters = radii * 2.0
         smooth_diameters = self._smooth_profile(diameters)
+        n_points = len(smooth_diameters)
 
-        # Ignore end caps of centerline to prevent tip distance transform drop-off artifacts
-        end_ignore = 15
-        if len(smooth_diameters) > 2 * end_ignore + 5:
-            valid_indices = list(range(end_ignore, len(smooth_diameters) - end_ignore))
+        # Ignore vessel endpoints / tapering tips (ignore first and last 10% of skeleton points)
+        trim = int(np.floor(0.10 * n_points))
+        if n_points > 2 * trim + 3 and trim > 0:
+            valid_indices = list(range(trim, n_points - trim))
         else:
-            valid_indices = list(range(len(smooth_diameters)))
+            valid_indices = list(range(n_points))
 
         valid_diameters = smooth_diameters[valid_indices]
 
@@ -129,12 +211,14 @@ class QCAService:
         x_min = int(x_coords[min_idx])
         y_min = int(y_coords[min_idx])
 
-        # Estimate reference vessel diameter (d_ref) from neighboring non-stenotic segments or 75th percentile
+        # Estimate reference vessel diameter (d_ref) from neighboring non-stenotic segments
         neighborhood_window = 25
         neigh_start = max(0, min_idx - neighborhood_window)
-        neigh_end = min(len(smooth_diameters), min_idx + neighborhood_window + 1)
-        neighbor_diameters = np.concatenate([smooth_diameters[neigh_start:max(neigh_start, min_idx-3)],
-                                             smooth_diameters[min(neigh_end, min_idx+4):neigh_end]])
+        neigh_end = min(n_points, min_idx + neighborhood_window + 1)
+        neighbor_diameters = np.concatenate([
+            smooth_diameters[neigh_start:max(neigh_start, min_idx - 3)],
+            smooth_diameters[min(neigh_end, min_idx + 4):neigh_end]
+        ])
 
         if len(neighbor_diameters) > 0:
             d_ref = float(np.percentile(neighbor_diameters, 75))
@@ -182,14 +266,17 @@ class QCAService:
     ) -> str:
         """
         Renders an annotated QCA visual diagnostic image with:
-          - Cyan vessel contours
-          - Green arterial centerline
+          - Clean semi-transparent cyan highlight (#00D2FF) ONLY over the segmented coronary artery
+          - Smooth green arterial centerline along vessel path
           - Red circle & crosshair at bottleneck minimum lumen diameter (d_min)
-          - Yellow line at reference vessel segment (d_ref)
           - High-contrast clinical metric header banner
         """
         if isinstance(original_image_input, (str, Path)) and os.path.exists(original_image_input):
-            bg_img = cv2.imread(str(original_image_input), cv2.IMREAD_COLOR)
+            try:
+                _, frames = parse_dicom_or_image(original_image_input)
+                bg_img = cv2.cvtColor(frames[0], cv2.COLOR_GRAY2BGR)
+            except Exception:
+                bg_img = cv2.imread(str(original_image_input), cv2.IMREAD_COLOR)
         elif isinstance(original_image_input, np.ndarray):
             bg_img = original_image_input.copy()
             if bg_img.ndim == 2:
@@ -200,16 +287,20 @@ class QCAService:
         h, w = bg_img.shape[:2]
         vis_img = bg_img.copy()
 
-        # 1. Draw Cyan Vessel Contours
-        contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        cv2.drawContours(vis_img, contours, -1, (255, 255, 0), 2)
+        # 1. Clean Semi-Transparent Cyan Highlight (#00D2FF -> BGR: 255, 210, 0) strictly over segmented vessel
+        mask_bool = binary_mask > 0
+        if np.any(mask_bool):
+            cyan_bgr = np.array([255, 210, 0], dtype=np.uint8)
+            alpha = 0.40
+            vis_img[mask_bool] = (vis_img[mask_bool] * (1.0 - alpha) + cyan_bgr * alpha).astype(np.uint8)
 
-        # 2. Draw Green Arterial Centerline
+        # 2. Draw Smooth Green Arterial Centerline
         skeleton, _, y_coords, x_coords = self.extract_centerline_and_diameters(binary_mask)
-        for i in range(len(x_coords)):
-            cv2.circle(vis_img, (int(x_coords[i]), int(y_coords[i])), 1, (0, 255, 0), -1)
+        if len(x_coords) > 1:
+            pts = np.column_stack((x_coords, y_coords)).astype(np.int32).reshape((-1, 1, 2))
+            cv2.polylines(vis_img, [pts], isClosed=False, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
 
-        # 3. Highlight Bottleneck (d_min) & Reference Segment (d_ref)
+        # 3. Highlight Bottleneck (d_min) with Red Crosshair and Marker
         lx = qca_metrics["lesion_coordinates"]["x"]
         ly = qca_metrics["lesion_coordinates"]["y"]
         stenosis = qca_metrics["stenosis_percentage"]
@@ -218,10 +309,10 @@ class QCAService:
         d_ref = qca_metrics["d_ref"]
         intervention = qca_metrics["intervention_recommended"]
 
-        # Red circle marker around narrowest stenosis bottleneck
         radius = max(6, int(d_ref))
-        cv2.circle(vis_img, (lx, ly), radius + 8, (0, 0, 255), 2)
-        cv2.drawMarker(vis_img, (lx, ly), (0, 0, 255), cv2.MARKER_CROSS, markerSize=12, thickness=2)
+        cv2.circle(vis_img, (lx, ly), radius + 8, (0, 0, 255), 2, cv2.LINE_AA)
+        cv2.drawMarker(vis_img, (lx, ly), (0, 0, 255), cv2.MARKER_CROSS, markerSize=14, thickness=2)
+
 
         # 4. Render High-Contrast Top Banner
         banner_height = 50
@@ -247,3 +338,4 @@ class QCAService:
 
 
 qca_service = QCAService()
+

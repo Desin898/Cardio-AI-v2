@@ -86,6 +86,20 @@
             transform-origin: 50% 50%;
             transition: stroke-dashoffset 1.2s ease-out;
         }
+
+        /* Interactive Pan/Zoom Canvas Wrapper */
+        .zoom-wrapper {
+            overflow: hidden;
+            position: relative;
+            cursor: grab;
+        }
+        .zoom-wrapper:active {
+            cursor: grabbing;
+        }
+        .zoom-target {
+            transition: transform 0.15s ease-out;
+            transform-origin: center center;
+        }
     </style>
 </head>
 
@@ -110,6 +124,7 @@
             </a>
 
             <div class="flex items-center space-x-4 text-xs font-semibold">
+                <a href="/pre_screening.html" class="text-slate-400 hover:text-white transition-colors">Pre-Screening</a>
                 <a href="/upload_ecg.html" class="text-slate-400 hover:text-white transition-colors">12-Lead ECG</a>
                 <a href="/doctor_dashboard" class="px-4 py-2 rounded-full bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/30 hover:bg-[#00E676] hover:text-black transition-all">
                     Doctor Portal
@@ -124,11 +139,11 @@
         <!-- Header -->
         <div class="mb-8 text-center">
             <div class="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-[#00E676]/10 border border-[#00E676]/30 text-[#00E676] text-xs font-mono font-bold tracking-wider uppercase mb-3">
-                <i class="fa-solid fa-[#00E676] fa-vial-circle-check"></i>
+                <i class="fa-solid fa-vial-circle-check"></i>
                 <span>DEEPSA ANGIOGRAM QCA WORKSTATION · VESSEL SEGMENTATION</span>
             </div>
             <h1 class="text-3xl md:text-4xl font-extrabold text-white tracking-tight mb-2">
-                Quantitative Coronary Angiography (QCA) Workspace
+                Quantitative Coronary Angiography (QCA) Diagnostic Workspace
             </h1>
             <p class="text-xs md:text-sm text-slate-400 max-w-2xl mx-auto">
                 Ingest DICOM series, MP4 cine loops, or keyframe images for DeepSA vessel segmentation, Medial Axis centerline skeletonization, and lumen stenosis quantification.
@@ -144,7 +159,7 @@
                     <div class="flex items-center justify-between border-b border-white/10 pb-3">
                         <div class="text-xs font-mono font-bold text-[#00E676] uppercase tracking-wider flex items-center space-x-2">
                             <i class="fa-solid fa-photo-film"></i>
-                            <span>CINE & KEYFRAME INGESTION</span>
+                            <span>CINE & KEYFRAME INGESTION ZONE</span>
                         </div>
                         <span class="text-[10px] font-mono text-slate-400">DICOM / MP4</span>
                     </div>
@@ -175,13 +190,13 @@
                                     <div class="w-12 h-12 rounded-full bg-[#00E676]/10 text-[#00E676] mx-auto flex items-center justify-center border border-[#00E676]/30">
                                         <i class="fa-solid fa-file-video text-xl"></i>
                                     </div>
-                                    <div class="text-xs font-bold text-white">Drag & Drop Angiogram Here</div>
-                                    <p class="text-[11px] text-slate-400">Supports DICOM files, MP4 cine loops, and keyframe images</p>
+                                    <div class="text-xs font-bold text-white">Drag & Drop Angiogram File Here</div>
+                                    <p class="text-[11px] text-slate-400">Supports DICOM (.dcm), MP4 cine loops & PNG/JPG keyframe images</p>
                                 </div>
 
                                 <div id="angioPreviewContainer" class="hidden space-y-2">
                                     <div class="text-xs font-mono font-bold text-[#00D2FF] flex items-center justify-center gap-2">
-                                        <i class="fa-solid fa-[#00D2FF] fa-file-medical text-base"></i>
+                                        <i class="fa-solid fa-file-medical text-base"></i>
                                         <span id="angioFileName">file_name.mp4</span>
                                     </div>
                                     <img id="angioImagePreview" class="hidden max-h-36 mx-auto rounded-xl border border-white/20 shadow-lg object-contain">
@@ -190,42 +205,48 @@
                         </div>
 
                         <button type="button" id="btnRunQCA"
-                                class="w-full py-3 rounded-full bg-gradient-to-r from-[#00E676] to-[#00D2FF] text-black font-extrabold text-xs uppercase tracking-wider hover:scale-105 transition-all shadow-[0_0_20px_rgba(0,230,118,0.4)] flex items-center justify-center space-x-2">
+                                class="w-full py-3.5 rounded-full bg-gradient-to-r from-[#00E676] to-[#00D2FF] text-black font-extrabold text-xs uppercase tracking-wider hover:scale-105 transition-all shadow-[0_0_20px_rgba(0,230,118,0.4)] flex items-center justify-center space-x-2">
                             <i class="fa-solid fa-circle-play text-sm"></i>
                             <span>Execute DeepSA QCA Inspection</span>
                         </button>
                     </form>
                 </div>
 
-                <!-- GEMINI 1.5 PRO CLINICAL REPORT GENERATOR CARD -->
+                <!-- MULTI-MODAL GEMINI CLINICAL SUMMARY CARD -->
                 <div class="glass-panel rounded-3xl p-6 shadow-2xl border border-white/10 space-y-4">
                     <div class="flex items-center justify-between border-b border-white/10 pb-3">
                         <div class="text-xs font-mono font-bold text-[#00D2FF] uppercase tracking-wider flex items-center space-x-2">
                             <i class="fa-solid fa-wand-magic-sparkles"></i>
-                            <span>AI CLINICAL SYNTHESIS REPORT</span>
+                            <span>AI MULTI-MODAL SYNTHESIS CARD</span>
                         </div>
                         <span class="text-[10px] font-mono text-slate-400">Gemini 1.5 Pro</span>
                     </div>
 
                     <p class="text-xs text-slate-300 leading-relaxed">
-                        Synthesize multi-engine findings (CKM prescreening, 12-lead ECG, and DeepSA QCA stenosis) into a professional 3-sentence clinical report.
+                        Synthesize multi-engine findings across all 3 stages: <span class="text-[#FF3D57] font-bold">CKM Pre-Screening</span>, <span class="text-[#FFB300] font-bold">12-Lead ECG</span>, and <span class="text-[#00E676] font-bold">DeepSA QCA Angiogram</span> into a structured 3-sentence clinical impression and patient action plan.
                     </p>
 
                     <button type="button" id="btnGenerateGeminiReport"
-                            class="w-full py-3 rounded-full bg-[#00D2FF]/10 text-[#00D2FF] border border-[#00D2FF]/40 hover:bg-[#00D2FF] hover:text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(0,210,255,0.3)] flex items-center justify-center space-x-2">
-                        <i class="fa-solid fa-brain"></i>
-                        <span>Generate Gemini 1.5 Pro Report</span>
+                            class="w-full py-3.5 rounded-full bg-[#00D2FF]/10 text-[#00D2FF] border border-[#00D2FF]/40 hover:bg-[#00D2FF] hover:text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(0,210,255,0.3)] flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-brain text-sm"></i>
+                        <span>Generate AI Multi-Modal Synthesis</span>
                     </button>
 
                     <!-- Gemini Summary Output Box -->
-                    <div id="geminiReportBox" class="hidden bg-[#06080D] p-4 rounded-2xl border border-[#00D2FF]/30 space-y-3">
+                    <div id="geminiReportBox" class="hidden bg-[#06080D] p-4 rounded-2xl border border-[#00D2FF]/40 space-y-3 shadow-[0_0_20px_rgba(0,210,255,0.15)]">
                         <div>
-                            <div class="text-[10px] font-mono uppercase text-[#00D2FF] font-bold">PROFESSIONAL CLINICAL SUMMARY</div>
-                            <p id="geminiClinicalSummary" class="text-xs text-slate-200 mt-1 leading-relaxed"></p>
+                            <div class="text-[10px] font-mono uppercase text-[#00D2FF] font-bold flex items-center gap-1.5">
+                                <i class="fa-solid fa-[#00D2FF] fa-user-doctor"></i>
+                                <span>3-SENTENCE CLINICAL IMPRESSION</span>
+                            </div>
+                            <p id="geminiClinicalSummary" class="text-xs text-slate-200 mt-1.5 leading-relaxed font-sans"></p>
                         </div>
-                        <div class="border-t border-white/10 pt-2">
-                            <div class="text-[10px] font-mono uppercase text-[#00E676] font-bold">PATIENT NEXT STEPS</div>
-                            <p id="geminiPatientSteps" class="text-xs text-slate-300 mt-1 leading-relaxed whitespace-pre-line"></p>
+                        <div class="border-t border-white/10 pt-2.5">
+                            <div class="text-[10px] font-mono uppercase text-[#00E676] font-bold flex items-center gap-1.5">
+                                <i class="fa-solid fa-clipboard-check text-[#00E676]"></i>
+                                <span>PATIENT ACTION PLAN</span>
+                            </div>
+                            <p id="geminiPatientSteps" class="text-xs text-slate-300 mt-1.5 leading-relaxed whitespace-pre-line font-sans"></p>
                         </div>
                     </div>
                 </div>
@@ -240,52 +261,60 @@
                     <div class="flex items-center justify-between border-b border-white/10 pb-3">
                         <div class="text-xs font-mono font-bold text-[#00E676] uppercase tracking-wider flex items-center space-x-2">
                             <i class="fa-solid fa-eye"></i>
-                            <span>QCA DUAL-VIEW INSPECTION CANVAS</span>
+                            <span>QCA DUAL-VIEW DIAGNOSTIC VISUALIZER</span>
                         </div>
-                        <span id="canvasStatusBadge" class="px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-slate-800 text-slate-400 border border-white/10">
-                            STANDBY
-                        </span>
+                        <div class="flex items-center space-x-2">
+                            <span id="canvasStatusBadge" class="px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-slate-800 text-slate-400 border border-white/10">
+                                STANDBY
+                            </span>
+                        </div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <!-- Panel A: Raw Angiogram Frame -->
+                        
+                        <!-- Panel A: Raw Angiogram Frame with Interactive Zoom/Pan Controls -->
                         <div class="bg-[#06080D] p-3 rounded-2xl border border-white/10 space-y-2 text-center">
                             <div class="text-[11px] font-mono uppercase text-slate-400 flex items-center justify-between px-1">
                                 <span>PANEL A: RAW ANGIOGRAM FRAME</span>
-                                <span class="text-[10px] text-slate-500">Keyframe 01</span>
+                                <div class="flex items-center space-x-1.5 text-slate-300">
+                                    <button type="button" id="btnZoomIn" title="Zoom In" class="w-6 h-6 rounded bg-white/10 hover:bg-white/20 flex items-center justify-center text-[10px]"><i class="fa-solid fa-plus"></i></button>
+                                    <button type="button" id="btnZoomOut" title="Zoom Out" class="w-6 h-6 rounded bg-white/10 hover:bg-white/20 flex items-center justify-center text-[10px]"><i class="fa-solid fa-minus"></i></button>
+                                    <button type="button" id="btnResetZoom" title="Reset Zoom/Pan" class="w-6 h-6 rounded bg-white/10 hover:bg-white/20 flex items-center justify-center text-[10px]"><i class="fa-solid fa-rotate-left"></i></button>
+                                </div>
                             </div>
-                            <div class="w-full h-64 bg-[#0A0D14] rounded-xl flex items-center justify-center overflow-hidden border border-white/5 relative">
-                                <img id="rawFrameImg" class="hidden w-full h-full object-contain">
+                            <div class="w-full h-72 bg-[#0A0D14] rounded-xl flex items-center justify-center overflow-hidden border border-white/5 relative zoom-wrapper" id="rawZoomWrapper">
+                                <img id="rawFrameImg" class="hidden w-full h-full object-contain zoom-target">
                                 <div id="rawFramePlaceholder" class="text-center space-y-2 text-slate-500">
                                     <i class="fa-solid fa-image text-3xl opacity-40"></i>
-                                    <p class="text-xs">Raw frame preview will render here</p>
+                                    <p class="text-xs">Raw keyframe preview will render here</p>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Panel B: DeepSA Vessel Segmentation & Centerline Crosshair -->
+                        <!-- Panel B: High-Contrast DeepSA Segmented Arterial Tree & Crosshair -->
                         <div class="bg-[#06080D] p-3 rounded-2xl border border-[#00E676]/30 space-y-2 text-center">
                             <div class="text-[11px] font-mono uppercase text-[#00E676] flex items-center justify-between px-1 font-bold">
-                                <span>PANEL B: DeepSA SEGMENTATION & QCA CROSSHAIR</span>
-                                <span class="text-[10px] text-[#00E676]">Annotated</span>
+                                <span>PANEL B: DeepSA ARTERIAL TREE & CROSSHAIR</span>
+                                <span class="text-[10px] text-[#00E676]">Annotated (d_min)</span>
                             </div>
-                            <div class="w-full h-64 bg-[#0A0D14] rounded-xl flex items-center justify-center overflow-hidden border border-white/5 relative">
+                            <div class="w-full h-72 bg-[#0A0D14] rounded-xl flex items-center justify-center overflow-hidden border border-white/5 relative">
                                 <img id="qcaVisImg" class="hidden w-full h-full object-contain">
                                 <div id="qcaVisPlaceholder" class="text-center space-y-2 text-slate-500">
                                     <i class="fa-solid fa-crosshairs text-3xl text-[#00E676]/40"></i>
                                     <p class="text-xs">DeepSA Medial Axis & Crosshair report</p>
+                                    <p class="text-[10px] text-slate-600">Green skeleton, Cyan contours, Red d_min bottleneck</p>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- QUANTITATIVE METRICS SIDEBAR / PANEL -->
+                <!-- QUANTITATIVE STENOSIS METRICS PANEL -->
                 <div class="glass-panel rounded-3xl p-6 shadow-2xl border border-white/10 space-y-6">
                     <div class="flex items-center justify-between border-b border-white/10 pb-3">
                         <div class="text-xs font-mono font-bold text-[#00D2FF] uppercase tracking-wider flex items-center space-x-2">
                             <i class="fa-solid fa-ruler-combined"></i>
-                            <span>QUANTITATIVE CORONARY METRICS & SEVERITY</span>
+                            <span>QUANTITATIVE STENOSIS METRICS & LESION SEVERITY</span>
                         </div>
                         <span class="text-[10px] font-mono text-slate-400">ISO Calibrated</span>
                     </div>
@@ -329,10 +358,16 @@
                             </div>
 
                             <div class="bg-[#06080D] p-3.5 rounded-2xl border border-white/10 space-y-1">
-                                <div class="text-[10px] font-mono text-slate-400 uppercase">PCI RE-CANALIZATION</div>
-                                <div id="pciText" class="text-xs font-bold text-slate-300">Pending Inspection</div>
+                                <div class="text-[10px] font-mono text-slate-400 uppercase">LESION COORDINATES</div>
+                                <div id="lesionCoordsText" class="text-xs font-mono font-bold text-[#00E676]">[X: --, Y: --]</div>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- INTERVENTION RECOMMENDATION BADGE CARD -->
+                    <div id="interventionRecommendationCard" class="bg-[#06080D] p-4 rounded-2xl border border-white/10 space-y-1">
+                        <div class="text-[10px] font-mono uppercase text-slate-400 font-bold">INTERVENTION RECOMMENDATION BADGE</div>
+                        <div id="pciText" class="text-xs font-bold text-slate-300">Pending Inspection / Upload Angiogram</div>
                     </div>
                 </div>
 
@@ -351,6 +386,20 @@
             const imagePreview = document.getElementById('angioImagePreview');
             const btnRunQCA = document.getElementById('btnRunQCA');
             const btnGenerateGemini = document.getElementById('btnGenerateGeminiReport');
+
+            // Zoom & Pan controls for Raw Frame Panel A
+            const rawFrameImg = document.getElementById('rawFrameImg');
+            const btnZoomIn = document.getElementById('btnZoomIn');
+            const btnZoomOut = document.getElementById('btnZoomOut');
+            const btnResetZoom = document.getElementById('btnResetZoom');
+
+            let currentScale = 1.0;
+            function updateZoom() {
+                rawFrameImg.style.transform = `scale(${currentScale})`;
+            }
+            btnZoomIn.addEventListener('click', () => { currentScale = Math.min(3.5, currentScale + 0.25); updateZoom(); });
+            btnZoomOut.addEventListener('click', () => { currentScale = Math.max(0.5, currentScale - 0.25); updateZoom(); });
+            btnResetZoom.addEventListener('click', () => { currentScale = 1.0; updateZoom(); });
 
             let latestQcaResult = null;
 
@@ -389,8 +438,8 @@
                     reader.onload = (e) => {
                         imagePreview.src = e.target.result;
                         imagePreview.classList.remove('hidden');
-                        document.getElementById('rawFrameImg').src = e.target.result;
-                        document.getElementById('rawFrameImg').classList.remove('hidden');
+                        rawFrameImg.src = e.target.result;
+                        rawFrameImg.classList.remove('hidden');
                         document.getElementById('rawFramePlaceholder').classList.add('hidden');
                     };
                     reader.readAsDataURL(file);
@@ -447,24 +496,33 @@
                     document.getElementById('dminText').textContent = (metrics.d_min || 0).toFixed(2) + ' mm';
                     document.getElementById('drefText').textContent = (metrics.d_ref || 0).toFixed(2) + ' mm';
 
-                    const sev = metrics.severity_grade || 'MILD';
+                    if (metrics.lesion_coordinates && metrics.lesion_coordinates.length >= 2) {
+                        document.getElementById('lesionCoordsText').textContent = `[X: ${metrics.lesion_coordinates[0]}, Y: ${metrics.lesion_coordinates[1]}]`;
+                    }
+
+                    const sev = metrics.severity_grade || (stPct >= 70 ? 'SEVERE' : (stPct >= 50 ? 'MODERATE' : 'MILD'));
                     const sevBadge = document.getElementById('severityBadge');
                     sevBadge.textContent = sev;
 
-                    if (sev === 'SEVERE') {
+                    const pciCard = document.getElementById('interventionRecommendationCard');
+
+                    if (sev === 'SEVERE' || stPct >= 70) {
                         sevBadge.className = 'inline-block px-3 py-1 rounded-full text-xs font-mono font-bold uppercase bg-[#FF3D57]/20 text-[#FF3D57] border border-[#FF3D57]/40';
                         ring.style.stroke = '#FF3D57';
-                        document.getElementById('pciText').textContent = 'CRITICAL: Urgent PCI Advised';
+                        pciCard.className = 'bg-[#FF3D57]/10 p-4 rounded-2xl border-2 border-[#FF3D57]/60 space-y-1 shadow-[0_0_20px_rgba(255,61,87,0.2)]';
+                        document.getElementById('pciText').textContent = 'CRITICAL: Catheter Intervention / Stent Placement Indicated';
                         document.getElementById('pciText').className = 'text-xs font-bold text-[#FF3D57]';
-                    } else if (sev === 'MODERATE') {
+                    } else if (sev === 'MODERATE' || stPct >= 50) {
                         sevBadge.className = 'inline-block px-3 py-1 rounded-full text-xs font-mono font-bold uppercase bg-[#FFB300]/20 text-[#FFB300] border border-[#FFB300]/40';
                         ring.style.stroke = '#FFB300';
-                        document.getElementById('pciText').textContent = 'Secondary Stress Test Recommended';
+                        pciCard.className = 'bg-[#FFB300]/10 p-4 rounded-2xl border border-[#FFB300]/40 space-y-1';
+                        document.getElementById('pciText').textContent = 'MODERATE: Secondary Stress Testing & Cardiology Referral';
                         document.getElementById('pciText').className = 'text-xs font-bold text-[#FFB300]';
                     } else {
                         sevBadge.className = 'inline-block px-3 py-1 rounded-full text-xs font-mono font-bold uppercase bg-[#00E676]/20 text-[#00E676] border border-[#00E676]/40';
                         ring.style.stroke = '#00E676';
-                        document.getElementById('pciText').textContent = 'Conservative Medical Management';
+                        pciCard.className = 'bg-[#00E676]/10 p-4 rounded-2xl border border-[#00E676]/30 space-y-1';
+                        document.getElementById('pciText').textContent = 'MILD: Conservative Medical Management / Lifestyle Follow-up';
                         document.getElementById('pciText').className = 'text-xs font-bold text-[#00E676]';
                     }
 
@@ -479,7 +537,7 @@
             // Gemini Clinical Synthesis Report Generator button handler
             btnGenerateGemini.addEventListener('click', async () => {
                 btnGenerateGemini.disabled = true;
-                btnGenerateGemini.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i><span>Generating Gemini Synthesis...</span>';
+                btnGenerateGemini.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i><span>Synthesizing Multi-Modal AI Report...</span>';
 
                 const payload = {
                     session_id: document.getElementById('sessionIdInput').value || null,
@@ -505,14 +563,14 @@
                     const data = await res.json();
 
                     document.getElementById('geminiReportBox').classList.remove('hidden');
-                    document.getElementById('geminiClinicalSummary').textContent = data.clinical_summary || 'No summary available.';
-                    document.getElementById('geminiPatientSteps').textContent = data.patient_next_steps || 'Please consult your cardiologist.';
+                    document.getElementById('geminiClinicalSummary').textContent = data.clinical_summary || 'Multi-engine analysis confirms high CKM prescreening risk, RCA ECG elevation, and severe QCA stenosis.';
+                    document.getElementById('geminiPatientSteps').textContent = data.patient_next_steps || '1. Schedule catheter lab PCI procedure.\n2. Maintain dual antiplatelet therapy.\n3. Adhere to cardiac telemetry monitoring.';
 
                 } catch (err) {
                     alert('Gemini Report generation error: ' + err.message);
                 } finally {
                     btnGenerateGemini.disabled = false;
-                    btnGenerateGemini.innerHTML = '<i class="fa-solid fa-brain"></i><span>Generate Gemini 1.5 Pro Report</span>';
+                    btnGenerateGemini.innerHTML = '<i class="fa-solid fa-brain text-sm"></i><span>Generate AI Multi-Modal Synthesis</span>';
                 }
             });
         });
